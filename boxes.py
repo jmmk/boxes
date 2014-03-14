@@ -13,11 +13,16 @@ CONFIG = os.path.expanduser('~/.boxes')
 DEFAULTS = {
         'grid_columns': 8,
         'grid_rows': 4,
-        'hotkey': '<Alt>R',
+        'hotkey': 'Alt+R',
+        'background_color': 'rgba(75, 77, 81, 255)',
+        'box_background_color': 'rgba(100, 106, 116, 204)',
+        'selected_box_background_color': 'rgba(50, 53, 58, 0.8)'
 }
 
 class SelectionGrid(QtGui.QFrame):
 
+
+    reset_grid = QtCore.Signal()
 
     def __init__(self, desktop):
         super(SelectionGrid, self).__init__()
@@ -30,9 +35,7 @@ class SelectionGrid(QtGui.QFrame):
 
         self.load_config()
         keybinder.bind(self.settings['hotkey'], self.toggle)
-
         self.construct_grid()
-        self.show_grid()
 
     def construct_grid(self):
         self.grid = QtGui.QGridLayout(self)
@@ -44,6 +47,8 @@ class SelectionGrid(QtGui.QFrame):
 
     def mousePressEvent(self, event):
         grid_box = self.childAt(event.x(), event.y())
+        color = self.settings['selected_box_background_color']
+        grid_box.setStyleSheet('background-color: {color};'.format(color=color))
         row, col = self.get_box_position(grid_box)
 
         self.current_selection = {
@@ -79,6 +84,7 @@ class SelectionGrid(QtGui.QFrame):
 
         self.windows.resize_window(self.active_window_id, x_pos, y_pos, size_x, size_y)
         self.hide()
+        self.reset_grid.emit()
 
     def get_box_position(self, grid_box):
         index = self.grid.indexOf(grid_box)
@@ -96,12 +102,17 @@ class SelectionGrid(QtGui.QFrame):
         self.setGeometry(x, y, w, h)
         self.setWindowTitle('boxes')
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        color = self.settings['background_color']
+        self.setStyleSheet('background-color: {color};'.format(color=color))
 
         self.active_window_id = self.windows.get_active_window()
         self.show()
 
     def toggle(self):
-        pass
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show_grid()
 
     def load_config(self):
         self.settings = DEFAULTS
@@ -129,8 +140,14 @@ class GridBox(QtGui.QFrame):
 
     def __init__(self, parent):
         super(GridBox, self).__init__(parent)
+        parent.reset_grid.connect(self.reset_defaults)
 
         self.setFrameShape(QtGui.QFrame.StyledPanel)
+        self.bg_color = parent.settings['box_background_color']
+        self.setStyleSheet('background-color: {color};'.format(color=self.bg_color))
+
+    def reset_defaults(self):
+        self.setStyleSheet('background-color: {color};'.format(color=self.bg_color))
 
 
 def main():
