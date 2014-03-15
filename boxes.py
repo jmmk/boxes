@@ -48,40 +48,39 @@ class SelectionGrid(QtGui.QFrame):
                 self.grid.addWidget(grid_box, i, j)
 
     def mousePressEvent(self, event):
-        grid_box = self.childAt(event.x(), event.y())
-        color = self.settings['selected_box_background_color']
-        grid_box.setStyleSheet('background-color: {color};border:none;'.format(color=color))
-        row, col = self.get_box_position(grid_box)
-
-        self.current_selection = {
-                'start_row': row,
-                'start_col': col
-        }
-
-    def mouseReleaseEvent(self, event):
-        grid_box = self.childAt(event.x(), event.y())
-        row, col = self.get_box_position(grid_box)
-
-        self.current_selection['end_row'] = row
-        self.current_selection['end_col'] = col
-
-        self.calculate_resize()
-
-    def mouseMoveEvent(self, event):
-        grid_box = self.childAt(event.x(), event.y())
-        if grid_box:
+        if event.button() == QtCore.Qt.LeftButton:
+            grid_box = self.childAt(event.x(), event.y())
+            color = self.settings['selected_box_background_color']
+            grid_box.setStyleSheet('background-color: {color};border:none;'.format(color=color))
             row, col = self.get_box_position(grid_box)
 
-            self.current_selection['outer_x'] = col
-            self.current_selection['outer_y'] = row
+            self.current_selection = {
+                    'start_row': row,
+                    'start_col': col
+            }
 
-            self.highlight_selection.emit()
+    def mouseReleaseEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.windows.resize_window(*self.calculate_resize())
+            self.hide()
+            self.reset_grid.emit()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & QtCore.Qt.LeftButton:
+            grid_box = self.childAt(event.x(), event.y())
+            if grid_box:
+                row, col = self.get_box_position(grid_box)
+
+                self.current_selection['outer_x'] = col
+                self.current_selection['outer_y'] = row
+
+                self.highlight_selection.emit()
 
     def calculate_resize(self):
         y1 = self.current_selection['start_row']
-        y2 = self.current_selection['end_row']
+        y2 = self.current_selection['outer_y']
         x1 = self.current_selection['start_col']
-        x2 = self.current_selection['end_col']
+        x2 = self.current_selection['outer_x']
 
         start_x, end_x = sorted((x1, x2))
         start_y, end_y = sorted((y1, y2))
@@ -94,9 +93,7 @@ class SelectionGrid(QtGui.QFrame):
         size_x = box_size_x * (end_x - start_x + 1)
         size_y = box_size_y * (end_y - start_y + 1)
 
-        self.windows.resize_window(self.active_window_id, x_pos, y_pos, size_x, size_y)
-        self.hide()
-        self.reset_grid.emit()
+        return (self.active_window_id, x_pos, y_pos, size_x, size_y)
 
     def get_box_position(self, grid_box):
         index = self.grid.indexOf(grid_box)
