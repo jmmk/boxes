@@ -16,13 +16,14 @@ DEFAULTS = {
         'hotkey': 'Alt+R',
         'background_color': 'rgba(75, 77, 81, 255)',
         'box_background_color': 'rgba(100, 106, 116, 204)',
-        'selected_box_background_color': 'rgba(50, 53, 58, 0.8)'
+        'selected_box_background_color': 'rgba(50, 53, 58, 204)'
 }
 
 class SelectionGrid(QtGui.QFrame):
 
 
     reset_grid = QtCore.Signal()
+    highlight_selection = QtCore.Signal()
 
     def __init__(self, desktop):
         super(SelectionGrid, self).__init__()
@@ -36,19 +37,20 @@ class SelectionGrid(QtGui.QFrame):
         self.load_config()
         keybinder.bind(self.settings['hotkey'], self.toggle)
         self.construct_grid()
+        self.init_grid_ui()
 
     def construct_grid(self):
         self.grid = QtGui.QGridLayout(self)
 
         for i in range(1, self.settings['grid_rows'] + 1):
             for j in range(1, self.settings['grid_columns'] + 1):
-                grid_box = GridBox(self)
+                grid_box = GridBox(self, i, j)
                 self.grid.addWidget(grid_box, i, j)
 
     def mousePressEvent(self, event):
         grid_box = self.childAt(event.x(), event.y())
         color = self.settings['selected_box_background_color']
-        grid_box.setStyleSheet('background-color: {color};'.format(color=color))
+        grid_box.setStyleSheet('background-color: {color};border:none;'.format(color=color))
         row, col = self.get_box_position(grid_box)
 
         self.current_selection = {
@@ -64,6 +66,16 @@ class SelectionGrid(QtGui.QFrame):
         self.current_selection['end_col'] = col
 
         self.calculate_resize()
+
+    def mouseMoveEvent(self, event):
+        grid_box = self.childAt(event.x(), event.y())
+        if grid_box:
+            row, col = self.get_box_position(grid_box)
+
+            self.current_selection['outer_x'] = col
+            self.current_selection['outer_y'] = row
+
+            self.highlight_selection.emit()
 
     def calculate_resize(self):
         y1 = self.current_selection['start_row']
@@ -92,7 +104,7 @@ class SelectionGrid(QtGui.QFrame):
 
         return (row, col)
 
-    def show_grid(self):
+    def init_grid_ui(self):
         w = self.settings['grid_window_width']
         h = self.settings['grid_window_height']
 
@@ -103,8 +115,13 @@ class SelectionGrid(QtGui.QFrame):
         self.setWindowTitle('boxes')
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         color = self.settings['background_color']
-        self.setStyleSheet('background-color: {color};'.format(color=color))
+        self.setStyleSheet(
+                'background-color: {color};'
+                'border-radius: 5px;'
+                .format(color=color)
+        )
 
+    def show_grid(self):
         self.active_window_id = self.windows.get_active_window()
         self.show()
 
@@ -138,16 +155,38 @@ class SelectionGrid(QtGui.QFrame):
 class GridBox(QtGui.QFrame):
 
 
-    def __init__(self, parent):
+    def __init__(self, parent, row, col):
         super(GridBox, self).__init__(parent)
         parent.reset_grid.connect(self.reset_defaults)
+        parent.highlight_selection.connect(self.on_selection_update)
+
+        self.row = row
+        self.col = col
+        self.bg_color = parent.settings['box_background_color']
+        self.selected_bg_color = parent.settings['selected_box_background_color']
+        self.parent = parent
 
         self.setFrameShape(QtGui.QFrame.StyledPanel)
-        self.bg_color = parent.settings['box_background_color']
-        self.setStyleSheet('background-color: {color};'.format(color=self.bg_color))
+        self.setStyleSheet('background-color: {color};border:none;'.format(color=self.bg_color))
 
     def reset_defaults(self):
-        self.setStyleSheet('background-color: {color};'.format(color=self.bg_color))
+        self.setStyleSheet('background-color: {color};border:none;'.format(color=self.bg_color))
+
+    def on_selection_update(self):
+        start_x = self.parent.current_selection['start_col']
+        start_y = self.parent.current_selection['start_row']
+        outer_x = self.parent.current_selection['outer_x']
+        outer_y = self.parent.current_selection['outer_y']
+
+        x_bounds = sorted((start_x, outer_x))
+        y_bounds = sorted((start_y, outer_y))
+
+        selected_x = x_bounds[0] <= self.col <= x_bounds[1]
+        selected_y = y_bounds[0] <= self.row <= y_bounds[1]
+        if selected_x and selected_y:
+            self.setStyleSheet('background-color: {color};border:none;'.format(color=self.selected_bg_color))
+        else:
+            self.reset_defaults()
 
 
 def main():
