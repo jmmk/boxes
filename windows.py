@@ -10,5 +10,8 @@ class WindowHelper(object):
         return window_id
 
     def resize_window(self, id, x, y, w, h):
-        cmd = 'wmctrl -i -r {id} -e 0,{x},{y},{w},{h}'.format(id=id, x=x, y=y, w=w, h=h)
-        subprocess.call(cmd, shell=True)
+        unmaximize = 'wmctrl -i -r {id} -b remove,maximized_vert,maximized_horz'.format(id=id)
+        subprocess.call(unmaximize, shell=True)
+
+        resize = 'wmctrl -i -r {id} -e 0,{x},{y},{w},{h}'.format(id=id, x=x, y=y, w=w, h=h)
+        subprocess.call(resize, shell=True)
